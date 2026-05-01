@@ -1,0 +1,195 @@
+# Architecture — PDF Bank Statement → Excel
+
+This document explains *why* the project is built the way it is, so a human or
+an LLM joining the project can make consistent decisions without re-deriving
+them.
+
+## Goal
+
+Take PDF bank statements dropped into an `input/` folder and emit a matching
+`.xlsx` file per PDF into `output/`, using a fixed accounting schema:
+`Date | Description | Money Out | Money In | Balance`.
+
+This is a single-business tool. There is no concept of "client" or "tenant".
+
+## Non-goals
+
+- Categorising transactions (no rules engine, no GL coding).
+- Reconciling against another ledger.
+- A web UI or service. This is a local CLI / script.
+- Cloud OCR or paid APIs. We stay local and free.
+
+## Pipeline
+
+The tool is a linear pipeline. Every stage has one job and a typed input/output,
+so it can be tested in isolation and replaced without touching the others.
+
+```
+input/*.pdf
+   │
+   ▼
+[1] ingest      — discover PDFs, decide what to process
+   │
+   ▼
+[2] detect      — identify the bank (HSBC / Barclays / generic)
+   │              and whether the PDF is text or scanned
+   │
+   ▼
+[3] extract     — pull raw rows out of the PDF
+   │              (text path: pdfplumber)
+   │              (scanned path: pdf2image → Tesseract → text)
+   │              one extractor module per bank layout
+   │
+   ▼
+[4] normalize   — coerce raw rows into the canonical Transaction model
+   │              (parse dates, money, drop rubbish, validate balance chain)
+   │
+   ▼
+[5] export      — write a .xlsx to output/ with the standard columns
+   │
+   ▼
+output/*.xlsx
+```
+
+If any stage fails for a given PDF, the file is moved to `failed/` with a
+sibling `.log` explaining why. The rest of the batch keeps going.
+
+## Why a strategy pattern for extractors
+
+Bank statements look wildly different across banks. HSBC's tables, Barclays'
+tables, and a random building society's tables share almost no structure.
+Trying to write one extractor that handles all of them produces a mess of
+`if bank == "hsbc"` branches.
+
+Instead: one module per bank under `extractors/`, each exposing the same
+`Extractor` protocol (`extract(pdf_path) -> list[RawRow]`). A dispatcher in
+`detect.py` picks the right extractor based on text fingerprints in the PDF
+("HSBC UK Bank plc", "Barclays Bank UK PLC", etc.). A `generic.py` fallback
+uses heuristics for unknown layouts — best-effort, expected to fail
+sometimes, that's fine.
+
+To support a new bank, you add one file. You do not modify existing files.
+
+## OCR fallback
+
+Some banks (HSBC and Barclays in our sample set) issue scanned PDFs where
+the "text" is actually an image. `pdfplumber` returns nothing useful for these.
+
+Detection heuristic: if `pdfplumber` extracts fewer than N characters per page
+on average, treat the PDF as scanned and run the OCR path.
+
+OCR path: `pdf2image` rasterises each page to PNG, `pytesseract` runs OCR,
+and the resulting text is fed to the same extractor as the text path. The
+extractor doesn't know or care which path produced its input.
+
+OCR is lossy. Numbers occasionally come out wrong (1 vs l, 0 vs O). The
+`normalize` stage validates that running balances chain correctly
+(`prev_balance + money_in - money_out == balance`); rows that break the chain
+are flagged in the Excel output with a `?` marker so a human can spot-check.
+
+## Canonical model
+
+`models.py` defines `Transaction` as a frozen dataclass:
+
+```python
+@dataclass(frozen=True)
+class Transaction:
+    date: datetime.date
+    description: str
+    money_out: Decimal | None   # exactly one of money_out / money_in is set
+    money_in: Decimal | None
+    balance: Decimal | None     # may be None if statement omits it
+    confidence: Literal["ok", "low"]  # "low" if balance chain didn't validate
+```
+
+Money is `Decimal`, never `float`. Dates are `datetime.date`, never strings.
+This is enforced at the `normalize` boundary — extractors return `RawRow`
+(strings), and only `normalize` produces `Transaction`.
+
+## Configuration
+
+A single `config.toml` in the project root holds tunable values:
+
+- `input_dir`, `output_dir`, `failed_dir`
+- `ocr.min_chars_per_page` — threshold for "this is scanned"
+- `ocr.tesseract_lang` — default `eng`
+- `extractors.priority` — list, controls dispatcher order
+
+No environment variables, no flags. One file, one source of truth.
+
+## Logging
+
+`logging` from the stdlib, configured in `__main__.py`. Every PDF gets a log
+line per stage at INFO. Failures are ERROR with a traceback. Logs go to
+stdout *and* `logs/run-YYYY-MM-DD.log`. No `print()` anywhere in the codebase.
+
+## Testing
+
+`pytest`. Tests live under `tests/`. Sample PDFs (anonymised — real account
+numbers and names redacted) live under `tests/samples/`.
+
+Each extractor has its own test file with at least one good sample and one
+known-tricky sample. The pipeline has an end-to-end test that runs the full
+flow on a fixture and diffs the resulting `.xlsx` against an expected one.
+
+## Folder layout
+
+```
+pdf-bank-to-excel/
+├── ARCHITECTURE.md          ← this file
+├── CLAUDE.md                ← rules for LLMs working on this repo
+├── README.md                ← human onboarding
+├── pyproject.toml
+├── config.toml
+├── input/                   ← drop PDFs here (gitignored)
+├── output/                  ← generated .xlsx (gitignored)
+├── failed/                  ← unprocessable PDFs + .log files (gitignored)
+├── logs/                    ← run logs (gitignored)
+├── src/
+│   └── statement_to_excel/
+│       ├── __init__.py
+│       ├── __main__.py      ← CLI entry: python -m statement_to_excel
+│       ├── pipeline.py      ← orchestrates the stages
+│       ├── models.py        ← Transaction, Statement, RawRow
+│       ├── ingest.py
+│       ├── detect.py
+│       ├── ocr.py
+│       ├── normalize.py
+│       ├── export.py
+│       └── extractors/
+│           ├── __init__.py
+│           ├── base.py      ← Extractor protocol
+│           ├── hsbc.py
+│           ├── barclays.py
+│           └── generic.py
+└── tests/
+    ├── conftest.py
+    ├── samples/
+    └── test_*.py
+```
+
+## Library choices
+
+- **pdfplumber** — best balance of table extraction quality and ergonomics
+  for text PDFs. We tried `pypdf` (too low-level) and `pymupdf` (excellent
+  but AGPL-licensed, which complicates redistribution).
+- **pdf2image + pytesseract** — local OCR, free, no API costs. Trade-off
+  is accuracy versus paid options like AWS Textract; acceptable here because
+  the `normalize` stage catches arithmetic errors via balance validation.
+- **openpyxl** — for `.xlsx` output. Standard choice, no surprises.
+- **dataclasses** (stdlib) — over Pydantic. We don't need runtime validation
+  at every boundary; the only place validation matters is `normalize`, and
+  it's clearer as explicit code than as decorators.
+- **tomllib** (stdlib, Python 3.11+) — for `config.toml`. No extra dep.
+
+## Out of scope, deliberately
+
+Things that look tempting but we are *not* adding until there is a concrete
+need:
+
+- A plugin system for extractors (just add a file).
+- Async / parallel processing (one PDF at a time is fast enough; sequential
+  is easier to debug).
+- A database (CSV / Excel is the deliverable; persistence is the user's job).
+- ML-based extraction (rules + OCR are good enough for known bank layouts;
+  ML adds opacity and model-management overhead).

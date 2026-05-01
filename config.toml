@@ -1,0 +1,14 @@
+[paths]
+input_dir  = "input"
+output_dir = "output"
+failed_dir = "failed"
+log_dir    = "logs"
+
+[ocr]
+# PDFs with fewer characters per page than this threshold are treated as scanned.
+min_chars_per_page = 100
+tesseract_lang     = "eng"
+
+[extractors]
+# Dispatcher tries extractors in this order; first match wins.
+priority = ["hsbc", "barclays", "generic"]
