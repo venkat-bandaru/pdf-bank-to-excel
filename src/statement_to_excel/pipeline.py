@@ -7,16 +7,75 @@ failed/ with a sibling .log, and processing continues with the next file.
 from __future__ import annotations
 
 import logging
+import traceback
 from pathlib import Path
-from typing import Any
+
+from statement_to_excel import detect, export, ingest, normalize
+from statement_to_excel.extractors.barclays import BarclaysExtractor
+from statement_to_excel.extractors.base import Extractor
+from statement_to_excel.extractors.generic import GenericExtractor
+from statement_to_excel.extractors.hsbc import HsbcExtractor
+from statement_to_excel.models import Config, Statement
 
 log = logging.getLogger(__name__)
 
+_EXTRACTORS: dict[str, type[Extractor]] = {
+    "hsbc": HsbcExtractor,
+    "barclays": BarclaysExtractor,
+    "generic": GenericExtractor,
+}
 
-def run_pipeline(config: dict[str, Any]) -> None:
+
+def run(config: Config) -> None:
     """Discover PDFs and run each through ingest → detect → extract → normalize → export.
 
     Args:
-        config: Parsed contents of config.toml.
+        config: Typed configuration parsed from config.toml.
     """
-    raise NotImplementedError("see ARCHITECTURE.md")
+    pdf_paths = ingest.discover(config.input_dir)
+    log.info("Found %d PDF(s) to process in %s", len(pdf_paths), config.input_dir)
+
+    for pdf_path in pdf_paths:
+        log.info("Processing %s", pdf_path.name)
+        try:
+            _process_one(pdf_path, config)
+        except Exception:
+            reason = traceback.format_exc()
+            log.error("Failed to process %s:\n%s", pdf_path.name, reason)
+            _move_to_failed(pdf_path, config.failed_dir, reason)
+
+
+def _process_one(pdf_path: Path, config: Config) -> None:
+    """Run the full stage sequence for a single PDF.
+
+    Args:
+        pdf_path: Path to the PDF being processed.
+        config: Pipeline configuration.
+    """
+    bank_name, pdf_kind = detect.detect(pdf_path, config.ocr_min_chars_per_page)
+    log.info("%s: bank=%s kind=%s", pdf_path.name, bank_name, pdf_kind)
+
+    extractor = _EXTRACTORS[bank_name]()
+    # OCR path is not wired yet; scanned PDFs will fall through with no rows.
+    page_texts = None
+    raw_rows = extractor.extract(pdf_path, page_texts=page_texts)
+
+    transactions = normalize.normalize(raw_rows, pdf_path)
+    statement = Statement(source_pdf=pdf_path, bank=bank_name, transactions=transactions)
+    out_path = export.export(statement, config.output_dir)
+    log.info("%s: written to %s", pdf_path.name, out_path)
+
+
+def _move_to_failed(pdf_path: Path, failed_dir: Path, reason: str) -> None:
+    """Move an unprocessable PDF to failed/ and write a .log sibling explaining why.
+
+    Args:
+        pdf_path: The PDF that could not be processed.
+        failed_dir: Destination directory (created if absent).
+        reason: Human-readable failure explanation written to the .log file.
+    """
+    failed_dir.mkdir(parents=True, exist_ok=True)
+    dest = failed_dir / pdf_path.name
+    pdf_path.rename(dest)
+    dest.with_suffix(".log").write_text(reason, encoding="utf-8")
+    log.info("Moved %s to %s", pdf_path.name, failed_dir)

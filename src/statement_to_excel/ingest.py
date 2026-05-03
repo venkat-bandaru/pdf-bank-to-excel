@@ -21,4 +21,7 @@ def discover(input_dir: Path) -> list[Path]:
     Returns:
         Sorted list of PDF paths so processing order is deterministic.
     """
-    raise NotImplementedError("see ARCHITECTURE.md")
+    if not input_dir.is_dir():
+        log.warning("Input directory %s does not exist; nothing to ingest", input_dir)
+        return []
+    return sorted(p for p in input_dir.iterdir() if p.is_file() and p.suffix.lower() == ".pdf")
