@@ -1,7 +1,7 @@
 """CLI entry point: python -m statement_to_excel.
 
 Loads config.toml, sets up logging to stdout and logs/run-YYYY-MM-DD.log,
-then hands off to pipeline.run_pipeline() for every PDF found by ingest.
+then hands off to pipeline.run() for every PDF found by ingest.
 """
 
 from __future__ import annotations
@@ -10,6 +10,9 @@ import datetime
 import logging
 import tomllib
 from pathlib import Path
+
+from statement_to_excel import pipeline
+from statement_to_excel.models import Config
 
 
 def _configure_logging(log_dir: Path) -> None:
@@ -35,13 +38,23 @@ def main() -> None:
     """Load config, configure logging, and run the pipeline."""
     config_path = Path(__file__).parent.parent.parent / "config.toml"
     with config_path.open("rb") as fh:
-        config = tomllib.load(fh)
+        raw = tomllib.load(fh)
 
-    _configure_logging(Path(config["paths"]["log_dir"]))
+    config = Config(
+        input_dir=Path(raw["paths"]["input_dir"]).resolve(),
+        output_dir=Path(raw["paths"]["output_dir"]).resolve(),
+        failed_dir=Path(raw["paths"]["failed_dir"]).resolve(),
+        log_dir=Path(raw["paths"]["log_dir"]).resolve(),
+        ocr_min_chars_per_page=raw["ocr"]["min_chars_per_page"],
+        ocr_tesseract_lang=raw["ocr"]["tesseract_lang"],
+        extractor_priority=tuple(raw["extractors"]["priority"]),
+    )
+
+    _configure_logging(config.log_dir)
     log = logging.getLogger(__name__)
     log.info("starting statement-to-excel")
 
-    raise NotImplementedError("see ARCHITECTURE.md — wire up pipeline.run_pipeline()")
+    pipeline.run(config)
 
 
 if __name__ == "__main__":

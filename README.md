@@ -40,7 +40,7 @@ pip install -e ".[dev]"
 
 ## Usage
 
-1. Drop your PDF bank statements into the `input/` folder (created automatically on first run).
+1. Create an `input/` folder in the project root and drop your PDF bank statements into it.
 2. Run:
 
 ```bash
