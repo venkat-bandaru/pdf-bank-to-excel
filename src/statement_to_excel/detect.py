@@ -45,7 +45,7 @@ def detect(pdf_path: Path, min_chars_per_page: int) -> tuple[BankName, PdfKind]:
     fingerprint_text = "\n".join(page_texts)
     bank: BankName = "generic"
     for name, markers in _FINGERPRINTS:
-        if any(marker in fingerprint_text for marker in markers):
+        if any(_marker_in(fingerprint_text, marker) for marker in markers):
             bank = name
             break
 
@@ -54,3 +54,19 @@ def detect(pdf_path: Path, min_chars_per_page: int) -> tuple[BankName, PdfKind]:
         pdf_path.name, bank, pdf_kind, avg,
     )
     return bank, pdf_kind
+
+
+def _marker_in(text: str, marker: str) -> bool:
+    """Return True if `marker` appears in `text`, tolerating pdfplumber's
+    character-doubled rendering of bold strings.
+
+    HSBC's regulatory footer prints "HSBC UK Bank plc" in bold, which
+    pdfplumber extracts as "HHSSBBCC UUKK BBaannkk ppllcc" (every
+    non-space character duplicated). Fingerprints are written in their
+    natural form; this helper also checks the doubled form so detection
+    survives the extraction artefact.
+    """
+    if marker in text:
+        return True
+    doubled = "".join(ch if ch.isspace() else ch * 2 for ch in marker)
+    return doubled in text
