@@ -11,4 +11,4 @@ tesseract_lang     = "eng"
 
 [extractors]
 # Dispatcher tries extractors in this order; first match wins.
-priority = ["hsbc", "barclays", "generic"]
+priority = ["hsbc", "barclays", "lloyds", "generic"]

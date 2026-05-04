@@ -15,12 +15,13 @@ import pdfplumber
 
 log = logging.getLogger(__name__)
 
-BankName = Literal["hsbc", "barclays", "generic"]
+BankName = Literal["hsbc", "barclays", "lloyds", "generic"]
 PdfKind = Literal["text", "scanned"]
 
 _FINGERPRINTS: tuple[tuple[BankName, tuple[str, ...]], ...] = (
     ("hsbc", ("HSBC UK Bank plc", "HSBC Bank plc")),
     ("barclays", ("Barclays Bank UK PLC", "Barclays Bank PLC")),
+    ("lloyds", ("Lloyds Bank plc",)),
 )
 
 
