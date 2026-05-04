@@ -45,6 +45,7 @@ pip install -e ".[dev]"
 
 ```bash
 python -m statement_to_excel
+.venv\Scripts\python.exe -m statement_to_excel   
 ```
 
 3. Find the generated `.xlsx` files in `output/`.

@@ -2,7 +2,12 @@
   "permissions": {
     "allow": [
       "Bash(.venv/Scripts/python.exe *)",
-      "Bash(PYTHONPATH=src .venv/Scripts/python.exe *)"
+      "Bash(PYTHONPATH=src .venv/Scripts/python.exe *)",
+      "Bash(python -c ' *)",
+      "Bash(where python *)",
+      "Bash(py --version)",
+      "Bash(py -m pytest --version)",
+      "Bash(py -m pytest tests/test_extractors_barclays.py -v)"
     ]
   }
 }
