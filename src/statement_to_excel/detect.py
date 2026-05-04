@@ -7,6 +7,7 @@ character-density heuristic described in ARCHITECTURE.md.
 
 from __future__ import annotations
 
+import io
 import logging
 from pathlib import Path
 from typing import Literal
@@ -15,13 +16,14 @@ import pdfplumber
 
 log = logging.getLogger(__name__)
 
-BankName = Literal["hsbc", "barclays", "lloyds", "generic"]
+BankName = Literal["hsbc", "barclays", "lloyds", "metrobank", "generic"]
 PdfKind = Literal["text", "scanned"]
 
 _FINGERPRINTS: tuple[tuple[BankName, tuple[str, ...]], ...] = (
     ("hsbc", ("HSBC UK Bank plc", "HSBC Bank plc")),
     ("barclays", ("Barclays Bank UK PLC", "Barclays Bank PLC")),
     ("lloyds", ("Lloyds Bank plc",)),
+    ("metrobank", ("metrobank",)),
 )
 
 
@@ -36,7 +38,16 @@ def detect(pdf_path: Path, min_chars_per_page: int) -> tuple[BankName, PdfKind]:
     Returns:
         A (bank_name, pdf_kind) tuple consumed by the extract stage.
     """
-    with pdfplumber.open(pdf_path) as pdf:
+    raw = pdf_path.read_bytes()
+    # Some statements (notably Metrobank's) ship with a stray byte before
+    # the "%PDF-" magic; pdfplumber's parser silently fails on those and
+    # returns zero pages, which would route every such file to the
+    # "generic" extractor with kind="scanned". Stripping the preamble
+    # fixes the load without changing behaviour for normal PDFs.
+    pdf_start = raw.find(b"%PDF-")
+    if pdf_start > 0:
+        raw = raw[pdf_start:]
+    with pdfplumber.open(io.BytesIO(raw)) as pdf:
         page_texts = [page.extract_text() or "" for page in pdf.pages]
 
     total_chars = sum(len(t) for t in page_texts)

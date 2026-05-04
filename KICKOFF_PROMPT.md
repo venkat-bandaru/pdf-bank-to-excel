@@ -104,7 +104,7 @@ Drop *one* real bank statement PDF into `tests/samples/` first (anonymise
 it). Then:
 
 ```
-@tests/samples/Jan26.pdf
+@tests/samples/IAG Aug 24.pdf
 
 Implement ingest.py, detect.py, and extractors/generic.py just well
 enough to convert THIS specific PDF into a valid Excel file via
@@ -117,12 +117,12 @@ validates.
 ### Session 4+ — One bank at a time
 
 ```
-@tests/samples/20241219_32416697.pdf
+@tests/samples/IAG Aug 24.pdf
 
-Add extractors/hsbc.py. Detection signature: the string "HSBC UK Bank
-plc" appearing in extracted text. Use the existing generic extractor
-as a reference. Add tests/test_extractors_hsbc.py with at least one
+Add extractors/metrobank.py. Detection signature: the string "metrobank" appearing in extracted text. Use the existing generic extractor
+as a reference. Add tests/test_extractors_metrobank.py with at least one
 sample.
+After that let the pipeline's extractor registry know about this new bank.
 ```
 
 ### Session N — OCR

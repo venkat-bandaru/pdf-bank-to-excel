@@ -16,6 +16,7 @@ from statement_to_excel.extractors.base import Extractor
 from statement_to_excel.extractors.generic import GenericExtractor
 from statement_to_excel.extractors.hsbc import HsbcExtractor
 from statement_to_excel.extractors.lloyds import LloydsExtractor
+from statement_to_excel.extractors.metrobank import MetrobankExtractor
 from statement_to_excel.models import Config, Statement
 
 log = logging.getLogger(__name__)
@@ -24,6 +25,7 @@ _EXTRACTORS: dict[str, type[Extractor]] = {
     "hsbc": HsbcExtractor,
     "barclays": BarclaysExtractor,
     "lloyds": LloydsExtractor,
+    "metrobank": MetrobankExtractor,
     "generic": GenericExtractor,
 }
 
