@@ -10,7 +10,10 @@
       "Bash(py -m pytest tests/test_extractors_barclays.py -v)",
       "Bash(py *)",
       "PowerShell(python -c \"import pdfplumber; pdf=pdfplumber.open\\(r'D:\\\\work\\\\pdf-bank-to-excel\\\\tests\\\\samples\\\\FEB-APR-25.pdf'\\); [print\\('==== PAGE', i+1, '===='\\); print\\(p.extract_text\\(\\) or ''\\) for i,p in enumerate\\(pdf.pages\\)]\")",
-      "Bash(git stash *)"
+      "Bash(git stash *)",
+      "Bash(python *)",
+      "Bash(where py *)",
+      "Bash(D:/work/pdf-bank-to-excel/.venv/Scripts/python.exe *)"
     ]
   }
 }
