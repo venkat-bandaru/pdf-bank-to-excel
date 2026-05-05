@@ -16,7 +16,7 @@ import pdfplumber
 
 log = logging.getLogger(__name__)
 
-BankName = Literal["hsbc", "barclays", "lloyds", "metrobank", "generic"]
+BankName = Literal["hsbc", "barclays", "lloyds", "metrobank", "monzobank", "generic"]
 PdfKind = Literal["text", "scanned"]
 
 _FINGERPRINTS: tuple[tuple[BankName, tuple[str, ...]], ...] = (
@@ -24,6 +24,7 @@ _FINGERPRINTS: tuple[tuple[BankName, tuple[str, ...]], ...] = (
     ("barclays", ("Barclays Bank UK PLC", "Barclays Bank PLC")),
     ("lloyds", ("Lloyds Bank plc",)),
     ("metrobank", ("metrobank",)),
+    ("monzobank", ("Monzo Bank Limited",)),
 )
 
 

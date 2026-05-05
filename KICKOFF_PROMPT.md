@@ -104,7 +104,7 @@ Drop *one* real bank statement PDF into `tests/samples/` first (anonymise
 it). Then:
 
 ```
-@tests/samples/IAG Aug 24.pdf
+@tests/samples/Jan26.pdf
 
 Implement ingest.py, detect.py, and extractors/generic.py just well
 enough to convert THIS specific PDF into a valid Excel file via
