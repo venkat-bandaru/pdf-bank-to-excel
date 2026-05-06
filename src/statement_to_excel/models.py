@@ -38,7 +38,7 @@ class Transaction:
     Exactly one of money_out / money_in must be set (not both, not neither).
     balance may be None when the source statement omits running balances.
     confidence is "low" when the balance chain validation in normalize.py
-    found an arithmetic discrepancy (likely an OCR misread).
+    found an arithmetic discrepancy.
     """
 
     date: datetime.date
@@ -82,6 +82,5 @@ class Config:
     output_dir: Path
     failed_dir: Path
     log_dir: Path
-    ocr_min_chars_per_page: int
-    ocr_tesseract_lang: str
+    detect_min_chars_per_page: int
     extractor_priority: tuple[str, ...]

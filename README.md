@@ -3,25 +3,16 @@
 Converts PDF bank statements into `.xlsx` files with standardised columns:
 **Date | Description | Money Out | Money In | Balance**.
 
-Runs entirely local — no cloud OCR, no API costs.
+Runs entirely local — no cloud APIs, no costs.
+
+Text-based PDFs only. Scanned (image-only) PDFs are detected and logged but
+not processed; see `ARCHITECTURE.md` for the rationale.
 
 ## Prerequisites
 
 | Requirement | Version | Notes |
 |---|---|---|
 | Python | 3.11+ | `python --version` |
-| Tesseract OCR | 5.x | Only needed for scanned (image) PDFs |
-| Poppler | latest | Required by `pdf2image` for rasterising pages |
-
-**Installing Tesseract:**
-- macOS: `brew install tesseract`
-- Ubuntu/Debian: `sudo apt install tesseract-ocr`
-- Windows: download the installer from [UB Mannheim](https://github.com/UB-Mannheim/tesseract/wiki)
-
-**Installing Poppler:**
-- macOS: `brew install poppler`
-- Ubuntu/Debian: `sudo apt install poppler-utils`
-- Windows: download from [oschwartz10612/poppler-windows](https://github.com/oschwartz10612/poppler-windows/releases)
 
 ## Install
 
@@ -56,7 +47,8 @@ Logs are written to both the terminal and `logs/run-YYYY-MM-DD.log`.
 
 ## Run with Docker
 
-If you'd rather not install Python, Tesseract, and Poppler locally, the project ships a `Dockerfile` and `docker-compose.yml` that bundle everything.
+If you'd rather not install Python locally, the project ships a `Dockerfile`
+and `docker-compose.yml` that bundle the runtime.
 
 ```bash
 # One-time build (or after pulling code changes)
@@ -72,15 +64,19 @@ docker compose run --rm converter
 
 ## Supported banks
 
-| Bank | Layout |
-|---|---|
-| HSBC UK | Text and scanned PDFs |
-| Barclays UK | Text and scanned PDFs |
-| Other | Best-effort generic extraction |
+Per-layout extractors live in `src/statement_to_excel/extractors/`:
+HSBC UK, Barclays UK, Lloyds, Metro Bank, Monzo, NatWest, Revolut, Starling,
+Virgin Money, and Zempler. Anything else falls through to a best-effort
+generic extractor.
+
+All extractors operate on text-based PDFs; scanned statements are not
+supported.
 
 ## Configuration
 
-Edit `config.toml` in the project root to adjust paths, OCR settings, or extractor priority. No environment variables or CLI flags are used — one file, one source of truth.
+Edit `config.toml` in the project root to adjust paths, the
+scanned-detection threshold, or extractor priority. No environment variables
+or CLI flags are used — one file, one source of truth.
 
 ## Development
 

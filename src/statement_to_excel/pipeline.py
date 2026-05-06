@@ -70,13 +70,13 @@ def _process_one(pdf_path: Path, config: Config) -> None:
         pdf_path: Path to the PDF being processed.
         config: Pipeline configuration.
     """
-    bank_name, pdf_kind = detect.detect(pdf_path, config.ocr_min_chars_per_page)
+    bank_name, pdf_kind = detect.detect(pdf_path, config.detect_min_chars_per_page)
     log.info("%s: bank=%s kind=%s", pdf_path.name, bank_name, pdf_kind)
 
     extractor = _EXTRACTORS[bank_name]()
-    # OCR path is not wired yet; scanned PDFs will fall through with no rows.
-    page_texts = None
-    raw_rows = extractor.extract(pdf_path, page_texts=page_texts)
+    # Scanned PDFs are not supported; the extractor will return an empty list
+    # and the resulting .xlsx will have no transaction rows.
+    raw_rows = extractor.extract(pdf_path, page_texts=None)
 
     transactions = normalize.normalize(raw_rows, pdf_path)
     statement = Statement(source_pdf=pdf_path, bank=bank_name, transactions=transactions)

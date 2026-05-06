@@ -45,8 +45,7 @@ def main() -> None:
         output_dir=Path(raw["paths"]["output_dir"]).resolve(),
         failed_dir=Path(raw["paths"]["failed_dir"]).resolve(),
         log_dir=Path(raw["paths"]["log_dir"]).resolve(),
-        ocr_min_chars_per_page=raw["ocr"]["min_chars_per_page"],
-        ocr_tesseract_lang=raw["ocr"]["tesseract_lang"],
+        detect_min_chars_per_page=raw["detect"]["min_chars_per_page"],
         extractor_priority=tuple(raw["extractors"]["priority"]),
     )
 

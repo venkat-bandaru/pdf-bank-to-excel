@@ -17,7 +17,8 @@ This is a single-business tool. There is no concept of "client" or "tenant".
 - Categorising transactions (no rules engine, no GL coding).
 - Reconciling against another ledger.
 - A web UI or service. This is a local CLI / script.
-- Cloud OCR or paid APIs. We stay local and free.
+- OCR / scanned-PDF support (text-only PDFs are in scope; see "Scanned PDFs"
+  below).
 
 ## Pipeline
 
@@ -35,9 +36,7 @@ input/*.pdf
    │              and whether the PDF is text or scanned
    │
    ▼
-[3] extract     — pull raw rows out of the PDF
-   │              (text path: pdfplumber)
-   │              (scanned path: pdf2image → Tesseract → text)
+[3] extract     — pull raw rows out of the PDF using pdfplumber
    │              one extractor module per bank layout
    │
    ▼
@@ -70,22 +69,28 @@ sometimes, that's fine.
 
 To support a new bank, you add one file. You do not modify existing files.
 
-## OCR fallback
+## Scanned PDFs
 
-Some banks (HSBC and Barclays in our sample set) issue scanned PDFs where
-the "text" is actually an image. `pdfplumber` returns nothing useful for these.
+Some banks issue scanned PDFs where the "text" is actually an image.
+`pdfplumber` returns nothing useful for these.
 
 Detection heuristic: if `pdfplumber` extracts fewer than N characters per page
-on average, treat the PDF as scanned and run the OCR path.
+on average (`detect.min_chars_per_page` in `config.toml`), `detect.py`
+classifies the PDF as `scanned` and logs the classification.
 
-OCR path: `pdf2image` rasterises each page to PNG, `pytesseract` runs OCR,
-and the resulting text is fed to the same extractor as the text path. The
-extractor doesn't know or care which path produced its input.
+We do not OCR scanned PDFs. Earlier iterations sketched an OCR path
+(`pdf2image` + `pytesseract`); it was descoped because the sample set we
+actually need to handle is text-based, and local OCR added install friction
+(Tesseract, Poppler) and accuracy problems (1 vs l, 0 vs O misreads) without
+a clear payoff. Scanned PDFs flow through the pipeline and produce an empty
+`.xlsx`; the log line `kind=scanned` is the signal that no OCR happened.
 
-OCR is lossy. Numbers occasionally come out wrong (1 vs l, 0 vs O). The
-`normalize` stage validates that running balances chain correctly
+If scanned-PDF support is needed later, add an OCR module and wire it into
+`pipeline.py` between `detect` and `extract`. Update this section accordingly.
+
+The `normalize` stage still validates that running balances chain correctly
 (`prev_balance + money_in - money_out == balance`); rows that break the chain
-are flagged in the Excel output with a `?` marker so a human can spot-check.
+are flagged in the Excel output so a human can spot-check.
 
 ## Canonical model
 
@@ -111,8 +116,7 @@ This is enforced at the `normalize` boundary — extractors return `RawRow`
 A single `config.toml` in the project root holds tunable values:
 
 - `input_dir`, `output_dir`, `failed_dir`
-- `ocr.min_chars_per_page` — threshold for "this is scanned"
-- `ocr.tesseract_lang` — default `eng`
+- `detect.min_chars_per_page` — threshold for "this is scanned"
 - `extractors.priority` — list, controls dispatcher order
 
 No environment variables, no flags. One file, one source of truth.
@@ -153,7 +157,6 @@ pdf-bank-to-excel/
 │       ├── models.py        ← Transaction, Statement, RawRow
 │       ├── ingest.py
 │       ├── detect.py
-│       ├── ocr.py
 │       ├── normalize.py
 │       ├── export.py
 │       └── extractors/
@@ -173,9 +176,6 @@ pdf-bank-to-excel/
 - **pdfplumber** — best balance of table extraction quality and ergonomics
   for text PDFs. We tried `pypdf` (too low-level) and `pymupdf` (excellent
   but AGPL-licensed, which complicates redistribution).
-- **pdf2image + pytesseract** — local OCR, free, no API costs. Trade-off
-  is accuracy versus paid options like AWS Textract; acceptable here because
-  the `normalize` stage catches arithmetic errors via balance validation.
 - **openpyxl** — for `.xlsx` output. Standard choice, no surprises.
 - **dataclasses** (stdlib) — over Pydantic. We don't need runtime validation
   at every boundary; the only place validation matters is `normalize`, and
@@ -191,5 +191,5 @@ need:
 - Async / parallel processing (one PDF at a time is fast enough; sequential
   is easier to debug).
 - A database (CSV / Excel is the deliverable; persistence is the user's job).
-- ML-based extraction (rules + OCR are good enough for known bank layouts;
+- ML-based extraction (per-bank rules are good enough for known layouts;
   ML adds opacity and model-management overhead).

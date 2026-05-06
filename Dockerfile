@@ -16,15 +16,6 @@ RUN pip install --no-cache-dir --prefix=/install .
 # ── Stage 2: runtime ──────────────────────────────────────────────────────────
 FROM python:3.11-slim
 
-# System packages:
-#   tesseract-ocr  — OCR engine used by pytesseract (scanned PDF path)
-#   poppler-utils  — provides pdfinfo / pdftoppm used by pdf2image
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        tesseract-ocr \
-        poppler-utils \
-    && rm -rf /var/lib/apt/lists/*
-
 # Copy installed Python packages from the builder stage.
 COPY --from=builder /install /usr/local
 

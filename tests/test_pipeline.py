@@ -33,8 +33,7 @@ def jan26_config(tmp_path: Path, samples_dir: Path) -> Config:
         output_dir=output_dir,
         failed_dir=failed_dir,
         log_dir=log_dir,
-        ocr_min_chars_per_page=100,
-        ocr_tesseract_lang="eng",
+        detect_min_chars_per_page=100,
         extractor_priority=("hsbc", "barclays", "generic"),
     )
 

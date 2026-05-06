@@ -156,9 +156,8 @@ def test_config_is_frozen(tmp_path: Path) -> None:
         output_dir=tmp_path / "output",
         failed_dir=tmp_path / "failed",
         log_dir=tmp_path / "logs",
-        ocr_min_chars_per_page=100,
-        ocr_tesseract_lang="eng",
+        detect_min_chars_per_page=100,
         extractor_priority=("hsbc", "barclays", "generic"),
     )
     with pytest.raises(FrozenInstanceError):
-        cfg.ocr_tesseract_lang = "fra"  # type: ignore[misc]
+        cfg.detect_min_chars_per_page = 200  # type: ignore[misc]
