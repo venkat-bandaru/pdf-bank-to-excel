@@ -24,6 +24,7 @@ from statement_to_excel.extractors.starlingbank import StarlingBankExtractor
 from statement_to_excel.extractors.virginmoneybank import (
     VirginMoneyBankExtractor,
 )
+from statement_to_excel.extractors.zemplerbank import ZemplerBankExtractor
 from statement_to_excel.models import Config, Statement
 
 log = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ _EXTRACTORS: dict[str, type[Extractor]] = {
     "revolutbank": RevolutBankExtractor,
     "starlingbank": StarlingBankExtractor,
     "virginmoneybank": VirginMoneyBankExtractor,
+    "zemplerbank": ZemplerBankExtractor,
     "generic": GenericExtractor,
 }
 
