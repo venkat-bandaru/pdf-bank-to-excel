@@ -54,6 +54,22 @@ If a PDF cannot be processed it is moved to `failed/` with a `.log` file explain
 
 Logs are written to both the terminal and `logs/run-YYYY-MM-DD.log`.
 
+## Run with Docker
+
+If you'd rather not install Python, Tesseract, and Poppler locally, the project ships a `Dockerfile` and `docker-compose.yml` that bundle everything.
+
+```bash
+# One-time build (or after pulling code changes)
+docker compose build
+
+# Drop PDFs into ./input/, then run
+docker compose run --rm converter
+```
+
+`.xlsx` files appear in `./output/`, logs in `./logs/`, and unprocessable PDFs in `./failed/`. The four folders are bind-mounted from the project root, so anything the container writes is immediately visible on your host.
+
+`config.toml` is mounted read-only into the container — edit it on the host and the next run picks up the change without a rebuild.
+
 ## Supported banks
 
 | Bank | Layout |

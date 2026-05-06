@@ -1,0 +1,33 @@
+# ── Version control ───────────────────────────────────────────────────────────
+.git
+.gitignore
+
+# ── Python caches ─────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# ── Data folders ──────────────────────────────────────────────────────────────
+# These are mounted as volumes at runtime; we never want real PDFs or generated
+# Excel files baked into the image.
+input/
+output/
+logs/
+failed/
+
+# ── Tests and samples ─────────────────────────────────────────────────────────
+# Sample PDFs can be large; they are only needed for pytest, not for running
+# the converter.
+tests/
+
+# ── Dev / editor artefacts ────────────────────────────────────────────────────
+.venv/
+*.egg-info/
+dist/
+build/
+.env
+.DS_Store

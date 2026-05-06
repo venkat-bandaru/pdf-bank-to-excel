@@ -1,0 +1,36 @@
+services:
+  converter:
+    build: .
+    # ── Volume mounts ──────────────────────────────────────────────────────────
+    # Each folder on the host (left of the colon) is mapped to the matching
+    # path inside the container (right of the colon).  Files written by the
+    # container appear immediately in the host folders and persist after the
+    # container exits.
+    #
+    # config.toml is mounted read-only (:ro) so the container can never
+    # accidentally overwrite your settings.
+    volumes:
+      - ./input:/app/input          # drop PDFs here before running
+      - ./output:/app/output        # converted .xlsx files appear here
+      - ./logs:/app/logs            # one log file per run date
+      - ./failed:/app/failed        # PDFs that could not be processed + .log
+      - ./config.toml:/app/config.toml:ro
+
+    # ── Restart policy ────────────────────────────────────────────────────────
+    # "no" is correct for a one-shot CLI: the container runs, finishes, and
+    # stops.  Change to "unless-stopped" later when the Outlook watcher service
+    # is added (Phase 2) so it restarts automatically after a crash or reboot.
+    restart: "no"
+
+# ── How to use ────────────────────────────────────────────────────────────────
+#
+#  First-time build (or after code changes):
+#    docker compose build
+#
+#  Process whatever PDFs are currently in input/:
+#    docker compose run --rm converter
+#
+#  Phase 2 (Outlook watcher — long-running service):
+#    Change restart to "unless-stopped" and run:
+#    docker compose up -d
+#    docker compose logs -f        ← tail the live log stream

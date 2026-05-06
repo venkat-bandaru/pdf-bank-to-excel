@@ -36,7 +36,7 @@ def _configure_logging(log_dir: Path) -> None:
 
 def main() -> None:
     """Load config, configure logging, and run the pipeline."""
-    config_path = Path(__file__).parent.parent.parent / "config.toml"
+    config_path = Path.cwd() / "config.toml"
     with config_path.open("rb") as fh:
         raw = tomllib.load(fh)
 
