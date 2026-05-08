@@ -18,6 +18,9 @@ dev = [
     "mypy~=1.10",
     "ruff~=0.4",
 ]
+ui = [
+    "streamlit~=1.35",
+]
 
 [project.scripts]
 statement-to-excel = "statement_to_excel.__main__:main"
