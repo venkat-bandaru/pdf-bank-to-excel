@@ -60,14 +60,21 @@ tables, and a random building society's tables share almost no structure.
 Trying to write one extractor that handles all of them produces a mess of
 `if bank == "hsbc"` branches.
 
-Instead: one module per bank under `extractors/`, each exposing the same
-`Extractor` protocol (`extract(pdf_path) -> list[RawRow]`). A dispatcher in
-`detect.py` picks the right extractor based on text fingerprints in the PDF
-("HSBC UK Bank plc", "Barclays Bank UK PLC", etc.). A `generic.py` fallback
-uses heuristics for unknown layouts — best-effort, expected to fail
-sometimes, that's fine.
+Instead: one module per bank *layout* under `extractors/`, each exposing
+the same `Extractor` protocol (`extract(pdf_path) -> list[RawRow]`). A
+dispatcher in `detect.py` picks the right extractor based on text
+fingerprints in the PDF ("HSBC UK Bank plc", "Barclays Bank UK PLC",
+etc.). A `generic.py` fallback uses heuristics for unknown layouts —
+best-effort, expected to fail sometimes, that's fine.
 
 To support a new bank, you add one file. You do not modify existing files.
+
+When the same bank rolls out a new statement format that shares no
+parsing code with the old one, treat it as a new layout: add a sibling
+file (e.g. `barclays_2026.py` next to `barclays.py`) and a more-specific
+fingerprint in `detect.py` that runs *before* the legacy bank's
+fingerprint. The legacy extractor stays untouched so existing customer
+statements keep working.
 
 ## Scanned PDFs
 

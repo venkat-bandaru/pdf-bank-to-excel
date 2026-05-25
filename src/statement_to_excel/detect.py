@@ -17,14 +17,18 @@ import pdfplumber
 log = logging.getLogger(__name__)
 
 BankName = Literal[
-    "hsbc", "barclays", "lloyds", "metrobank", "monzobank", "natwestbank",
-    "rbsbank", "revolutbank", "starlingbank", "tidebank", "virginmoneybank",
-    "zemplerbank", "generic",
+    "hsbc", "barclays_2026", "barclays", "lloyds", "metrobank", "monzobank",
+    "natwestbank", "rbsbank", "revolutbank", "starlingbank", "tidebank",
+    "virginmoneybank", "zemplerbank", "generic",
 ]
 PdfKind = Literal["text", "scanned"]
 
 _FINGERPRINTS: tuple[tuple[BankName, tuple[str, ...]], ...] = (
     ("hsbc", ("HSBC UK Bank plc", "HSBC Bank plc")),
+    # The 2026 layout shares the "Barclays Bank UK PLC" footer string
+    # with the legacy layout, so the more-specific 2026-only summary
+    # banner must be tried first. Order matters here.
+    ("barclays_2026", ("Last night's balance",)),
     ("barclays", ("Barclays Bank UK PLC", "Barclays Bank PLC")),
     ("lloyds", ("Lloyds Bank plc",)),
     ("metrobank", ("metrobank",)),

@@ -12,6 +12,7 @@ from pathlib import Path
 
 from statement_to_excel import detect, export, ingest, normalize
 from statement_to_excel.extractors.barclays import BarclaysExtractor
+from statement_to_excel.extractors.barclays_2026 import Barclays2026Extractor
 from statement_to_excel.extractors.base import Extractor
 from statement_to_excel.extractors.generic import GenericExtractor
 from statement_to_excel.extractors.hsbc import HsbcExtractor
@@ -33,6 +34,7 @@ log = logging.getLogger(__name__)
 
 _EXTRACTORS: dict[str, type[Extractor]] = {
     "hsbc": HsbcExtractor,
+    "barclays_2026": Barclays2026Extractor,
     "barclays": BarclaysExtractor,
     "lloyds": LloydsExtractor,
     "metrobank": MetrobankExtractor,
