@@ -21,6 +21,7 @@ from statement_to_excel.extractors.monzobank import MonzoBankExtractor
 from statement_to_excel.extractors.natwestbank import NatWestBankExtractor
 from statement_to_excel.extractors.revolutbank import RevolutBankExtractor
 from statement_to_excel.extractors.starlingbank import StarlingBankExtractor
+from statement_to_excel.extractors.tidebank import TideBankExtractor
 from statement_to_excel.extractors.virginmoneybank import (
     VirginMoneyBankExtractor,
 )
@@ -38,6 +39,7 @@ _EXTRACTORS: dict[str, type[Extractor]] = {
     "natwestbank": NatWestBankExtractor,
     "revolutbank": RevolutBankExtractor,
     "starlingbank": StarlingBankExtractor,
+    "tidebank": TideBankExtractor,
     "virginmoneybank": VirginMoneyBankExtractor,
     "zemplerbank": ZemplerBankExtractor,
     "generic": GenericExtractor,

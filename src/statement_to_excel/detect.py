@@ -18,7 +18,8 @@ log = logging.getLogger(__name__)
 
 BankName = Literal[
     "hsbc", "barclays", "lloyds", "metrobank", "monzobank", "natwestbank",
-    "revolutbank", "starlingbank", "virginmoneybank", "zemplerbank", "generic",
+    "revolutbank", "starlingbank", "tidebank", "virginmoneybank",
+    "zemplerbank", "generic",
 ]
 PdfKind = Literal["text", "scanned"]
 
@@ -31,6 +32,9 @@ _FINGERPRINTS: tuple[tuple[BankName, tuple[str, ...]], ...] = (
     ("natwestbank", ("National Westminster Bank Plc",)),
     ("revolutbank", ("Revolut Ltd",)),
     ("starlingbank", ("Starling Bank Limited",)),
+    ("tidebank", (
+        "Your Tide account is a bank account provided by ClearBank Limited",
+    )),
     ("virginmoneybank", ("Virgin Money",)),
     ("zemplerbank", ("Zempler Bank Ltd",)),
 )

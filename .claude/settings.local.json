@@ -14,7 +14,8 @@
       "Bash(python *)",
       "Bash(where py *)",
       "Bash(D:/work/pdf-bank-to-excel/.venv/Scripts/python.exe *)",
-      "PowerShell(py *)"
+      "PowerShell(py *)",
+      "PowerShell(Get-ChildItem -Path \"D:\\\\work\\\\pdf-bank-to-excel\\\\input\" -ErrorAction SilentlyContinue | Select-Object Name; Get-ChildItem -Path \"D:\\\\work\\\\pdf-bank-to-excel\\\\output\" -ErrorAction SilentlyContinue | Select-Object Name; Get-ChildItem -Path \"D:\\\\work\\\\pdf-bank-to-excel\\\\failed\" -ErrorAction SilentlyContinue | Select-Object Name; \"Input folder exists: \" + \\(Test-Path \"D:\\\\work\\\\pdf-bank-to-excel\\\\input\"\\); \"Output folder exists: \" + \\(Test-Path \"D:\\\\work\\\\pdf-bank-to-excel\\\\output\"\\); \"Failed folder exists: \" + \\(Test-Path \"D:\\\\work\\\\pdf-bank-to-excel\\\\failed\"\\))"
     ]
   }
 }
