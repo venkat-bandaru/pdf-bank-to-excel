@@ -19,6 +19,7 @@ from statement_to_excel.extractors.lloyds import LloydsExtractor
 from statement_to_excel.extractors.metrobank import MetrobankExtractor
 from statement_to_excel.extractors.monzobank import MonzoBankExtractor
 from statement_to_excel.extractors.natwestbank import NatWestBankExtractor
+from statement_to_excel.extractors.rbsbank import RbsBankExtractor
 from statement_to_excel.extractors.revolutbank import RevolutBankExtractor
 from statement_to_excel.extractors.starlingbank import StarlingBankExtractor
 from statement_to_excel.extractors.tidebank import TideBankExtractor
@@ -37,6 +38,7 @@ _EXTRACTORS: dict[str, type[Extractor]] = {
     "metrobank": MetrobankExtractor,
     "monzobank": MonzoBankExtractor,
     "natwestbank": NatWestBankExtractor,
+    "rbsbank": RbsBankExtractor,
     "revolutbank": RevolutBankExtractor,
     "starlingbank": StarlingBankExtractor,
     "tidebank": TideBankExtractor,
