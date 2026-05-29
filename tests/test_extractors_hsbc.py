@@ -128,6 +128,18 @@ def test_hsbc_obp_and_atm_codes_are_captured() -> None:
     assert atm.money_in == ""
 
 
+def test_hsbc_cheque_rows_classified_out_by_column(samples_dir: Path) -> None:
+    """September.pdf has five CHQ (cheque) rows. CHQ has no fixed direction,
+    so they must be classified by the column the amount sits in — here the
+    Paid out column. (These were dropped entirely before CHQ was recognised.)"""
+    rows = HsbcExtractor().extract(samples_dir / "September.pdf")
+    cheques = [r for r in rows if r.description.startswith("CHQ ")]
+    assert len(cheques) == 5
+    for r in cheques:
+        assert r.money_out == "10.00"
+        assert r.money_in == ""
+
+
 def test_hsbc_summary_parses_account_summary() -> None:
     """summary() lifts the four printed totals out of the statement text."""
     page = (
