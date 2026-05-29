@@ -42,7 +42,7 @@ from typing import Any
 
 import pdfplumber
 
-from statement_to_excel.models import RawRow
+from statement_to_excel.models import RawRow, RawSummary
 
 log = logging.getLogger(__name__)
 
@@ -170,6 +170,46 @@ class BarclaysExtractor:
         # convention used by the HSBC, Lloyds, and generic extractors.
         out.reverse()
         return out
+
+    def summary(
+        self, pdf_path: Path, page_texts: list[str] | None = None
+    ) -> RawSummary | None:
+        """Return Barclays' printed summary totals, or None if not found.
+
+        Implements the optional SummaryProvider protocol. Barclays labels the
+        figures "Start balance", "Money in", "Money out" and "End balance".
+        The flat extract_text is sufficient here — these summary labels sit on
+        their own lines and don't suffer the sidebar interleaving that forces
+        positional extraction for the transaction table.
+        """
+        if page_texts is None:
+            with pdfplumber.open(pdf_path) as pdf:
+                page_texts = [page.extract_text() or "" for page in pdf.pages]
+        return _parse_summary("\n".join(page_texts))
+
+
+def _parse_summary(text: str) -> RawSummary | None:
+    """Pull Barclays' Start balance / Money in / Money out / End balance."""
+    opening = _find_money(r"Start balance\s*([£]?[\d,]+\.\d{2})", text)
+    paid_in = _find_money(r"Money in\s*([£]?[\d,]+\.\d{2})", text)
+    paid_out = _find_money(r"Money out\s*([£]?[\d,]+\.\d{2})", text)
+    closing = _find_money(r"End balance\s*([£]?[\d,]+\.\d{2})", text)
+    if not any((opening, paid_in, paid_out, closing)):
+        return None
+    return RawSummary(
+        opening_balance=opening, paid_in=paid_in, paid_out=paid_out,
+        closing_balance=closing,
+    )
+
+
+def _summary_money(raw: str) -> str:
+    """Strip currency symbol, spaces and thousands separators (keeping sign)."""
+    return re.sub(r"[£,\s]", "", raw)
+
+
+def _find_money(pattern: str, text: str) -> str:
+    match = re.search(pattern, text, re.IGNORECASE)
+    return _summary_money(match.group(1)) if match else ""
 
 
 def _read_pdf_lines(pdf_path: Path) -> list[list[str]]:

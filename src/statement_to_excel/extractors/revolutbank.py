@@ -41,7 +41,7 @@ from pathlib import Path
 
 import pdfplumber
 
-from statement_to_excel.models import RawRow
+from statement_to_excel.models import RawRow, RawSummary
 
 log = logging.getLogger(__name__)
 
@@ -125,6 +125,45 @@ class RevolutBankExtractor:
             "revolutbank: %d row(s) parsed from %s", len(rows), pdf_path.name
         )
         return [_to_raw_row(r) for r in rows]
+
+    def summary(
+        self, pdf_path: Path, page_texts: list[str] | None = None
+    ) -> RawSummary | None:
+        """Return Revolut's printed "Balance summary" totals, or None.
+
+        Implements the optional SummaryProvider protocol. Revolut prints
+        Opening balance / Money in / Money out / Closing balance, using spaces
+        as thousands separators ("198 039.66") and a leading "-" on money out;
+        the cleaner strips the spaces and the money-out sign is discarded (the
+        magnitude is what reconcile compares against).
+        """
+        if page_texts is None:
+            page_texts = _read_pdf_text(pdf_path)
+        return _parse_summary("\n".join(page_texts))
+
+
+def _parse_summary(text: str) -> RawSummary | None:
+    """Pull Revolut's Opening / Money in / Money out / Closing figures."""
+    opening = _find_money(r"Opening balance\s*([£]?[\d, ]+\.\d{2})", text)
+    paid_in = _find_money(r"Money in\s*([£]?[\d, ]+\.\d{2})", text)
+    paid_out = _find_money(r"Money out\s*-?\s*([£]?[\d, ]+\.\d{2})", text)
+    closing = _find_money(r"Closing balance\s*([£]?[\d, ]+\.\d{2})", text)
+    if not any((opening, paid_in, paid_out, closing)):
+        return None
+    return RawSummary(
+        opening_balance=opening, paid_in=paid_in, paid_out=paid_out,
+        closing_balance=closing,
+    )
+
+
+def _summary_money(raw: str) -> str:
+    """Strip currency symbol, spaces and thousands separators (keeping sign)."""
+    return re.sub(r"[£,\s]", "", raw)
+
+
+def _find_money(pattern: str, text: str) -> str:
+    match = re.search(pattern, text, re.IGNORECASE)
+    return _summary_money(match.group(1)) if match else ""
 
 
 def _read_pdf_text(pdf_path: Path) -> list[str]:

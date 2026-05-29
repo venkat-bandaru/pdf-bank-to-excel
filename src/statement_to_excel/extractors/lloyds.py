@@ -29,7 +29,7 @@ from typing import Any
 
 import pdfplumber
 
-from statement_to_excel.models import RawRow
+from statement_to_excel.models import RawRow, RawSummary
 
 log = logging.getLogger(__name__)
 
@@ -110,6 +110,43 @@ class LloydsExtractor:
         # newest-first convention as the HSBC and generic extractors.
         rows.reverse()
         return rows
+
+    def summary(
+        self, pdf_path: Path, page_texts: list[str] | None = None
+    ) -> RawSummary | None:
+        """Return Lloyds' printed Money In / Money Out totals, or None.
+
+        Implements the optional SummaryProvider protocol. Only the in/out
+        totals are reported: Lloyds' "Balance on <start date>" reflects the
+        balance *after* that day's first transaction rather than a clean
+        period opening, so it cannot be used for the opening/closing check.
+        """
+        if page_texts is None:
+            with pdfplumber.open(pdf_path) as pdf:
+                page_texts = [page.extract_text() or "" for page in pdf.pages]
+        return _parse_summary("\n".join(page_texts))
+
+
+def _parse_summary(text: str) -> RawSummary | None:
+    """Pull Lloyds' "Money In" / "Money Out" summary totals."""
+    paid_in = _find_money(r"Money In\s*[£]?\s*([\d,]+\.\d{2})", text)
+    paid_out = _find_money(r"Money Out\s*[£]?\s*([\d,]+\.\d{2})", text)
+    if not (paid_in or paid_out):
+        return None
+    return RawSummary(
+        opening_balance="", paid_in=paid_in, paid_out=paid_out,
+        closing_balance="",
+    )
+
+
+def _summary_money(raw: str) -> str:
+    """Strip currency symbol, spaces and thousands separators (keeping sign)."""
+    return re.sub(r"[£,\s]", "", raw)
+
+
+def _find_money(pattern: str, text: str) -> str:
+    match = re.search(pattern, text, re.IGNORECASE)
+    return _summary_money(match.group(1)) if match else ""
 
 
 def _rows_from_page(page: Any) -> list[RawRow]:

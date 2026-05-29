@@ -44,7 +44,7 @@ from pathlib import Path
 
 import pdfplumber
 
-from statement_to_excel.models import RawRow
+from statement_to_excel.models import RawRow, RawSummary
 
 log = logging.getLogger(__name__)
 
@@ -156,6 +156,46 @@ class TideBankExtractor:
             "tidebank: %d row(s) parsed from %s", len(parsed), pdf_path.name
         )
         return _split_directions(parsed, header_balances)
+
+    def summary(
+        self, pdf_path: Path, page_texts: list[str] | None = None
+    ) -> RawSummary | None:
+        """Return Tide's printed summary totals, or None if not found.
+
+        Implements the optional SummaryProvider protocol. Tide prints "Total
+        paid in (£)" / "Total paid out (£)" and two "Balance (£) on <date>"
+        lines — the first is the opening, the second the closing.
+        """
+        if page_texts is None:
+            page_texts = _read_pdf_text(pdf_path)
+        return _parse_summary("\n".join(page_texts))
+
+
+def _parse_summary(text: str) -> RawSummary | None:
+    """Pull Tide's paid-in/paid-out totals and opening/closing balances."""
+    paid_in = _find_money(r"Total paid in\s*\([£]\)\s*([\d,]+\.\d{2})", text)
+    paid_out = _find_money(r"Total paid out\s*\([£]\)\s*([\d,]+\.\d{2})", text)
+    balances = re.findall(
+        r"Balance\s*\([£]\)\s*on\s+.*?([\d,]+\.\d{2})", text, re.IGNORECASE
+    )
+    opening = _summary_money(balances[0]) if balances else ""
+    closing = _summary_money(balances[-1]) if len(balances) >= 2 else ""
+    if not any((opening, paid_in, paid_out, closing)):
+        return None
+    return RawSummary(
+        opening_balance=opening, paid_in=paid_in, paid_out=paid_out,
+        closing_balance=closing,
+    )
+
+
+def _summary_money(raw: str) -> str:
+    """Strip currency symbol, spaces and thousands separators (keeping sign)."""
+    return re.sub(r"[£,\s]", "", raw)
+
+
+def _find_money(pattern: str, text: str) -> str:
+    match = re.search(pattern, text, re.IGNORECASE)
+    return _summary_money(match.group(1)) if match else ""
 
 
 def _read_pdf_text(pdf_path: Path) -> list[str]:

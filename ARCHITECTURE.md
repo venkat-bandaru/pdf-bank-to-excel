@@ -125,6 +125,18 @@ REVIEW plus the specific discrepancies). A failed reconciliation does **not**
 move the file to `failed/`: the rows we did extract are still useful, and the
 accountant wants to see them alongside the flag, not have them hidden.
 
+Summary formats differ per bank, so each extractor parses its own (the labels,
+currency formatting and even which figures are printed vary — Revolut uses
+spaces as thousands separators, Zempler prints only opening/closing, Lloyds'
+"balance on <start date>" is post-first-transaction and so only its in/out
+totals are trusted). `reconcile()` skips any check whose figure is absent, so
+a partial summary still validates what it can. Extractors whose statements
+print no usable summary (`barclays_2026`, `monzobank`, `metrobank`, and the
+`generic` fallback) simply do not implement `SummaryProvider`, and the
+pipeline skips reconciliation for them. `tests/test_reconciliation.py` pins
+this across every known extractor: each sample must reconcile cleanly or be a
+documented no-summary skip.
+
 ## Canonical model
 
 `models.py` defines `Transaction` as a frozen dataclass:

@@ -36,7 +36,7 @@ from pathlib import Path
 
 import pdfplumber
 
-from statement_to_excel.models import RawRow
+from statement_to_excel.models import RawRow, RawSummary
 
 log = logging.getLogger(__name__)
 
@@ -114,6 +114,42 @@ class ZemplerBankExtractor:
             "zemplerbank: %d row(s) parsed from %s", len(parsed), pdf_path.name
         )
         return _split_directions(parsed)
+
+    def summary(
+        self, pdf_path: Path, page_texts: list[str] | None = None
+    ) -> RawSummary | None:
+        """Return Zempler's printed Opening/Closing balances, or None.
+
+        Implements the optional SummaryProvider protocol. Zempler prints only
+        the opening and closing balances (no in/out totals); reconcile checks
+        ``opening + in - out == closing`` against the extracted rows. The
+        closing balance may be negative (e.g. "-£39.42"), so the sign is kept.
+        """
+        if page_texts is None:
+            page_texts = _read_pdf_text(pdf_path)
+        return _parse_summary("\n".join(page_texts))
+
+
+def _parse_summary(text: str) -> RawSummary | None:
+    """Pull Zempler's "Opening Balance:" / "Closing Balance:" figures."""
+    opening = _find_money(r"Opening Balance:?\s*(-?\s*[£]?\s*[\d,]+\.\d{2})", text)
+    closing = _find_money(r"Closing Balance:?\s*(-?\s*[£]?\s*[\d,]+\.\d{2})", text)
+    if not (opening or closing):
+        return None
+    return RawSummary(
+        opening_balance=opening, paid_in="", paid_out="",
+        closing_balance=closing,
+    )
+
+
+def _summary_money(raw: str) -> str:
+    """Strip currency symbol, spaces and thousands separators (keeping sign)."""
+    return re.sub(r"[£,\s]", "", raw)
+
+
+def _find_money(pattern: str, text: str) -> str:
+    match = re.search(pattern, text, re.IGNORECASE)
+    return _summary_money(match.group(1)) if match else ""
 
 
 def _read_pdf_text(pdf_path: Path) -> list[str]:
