@@ -24,7 +24,7 @@ from pathlib import Path
 
 import pdfplumber
 
-from statement_to_excel.models import RawRow
+from statement_to_excel.models import RawRow, RawSummary
 
 log = logging.getLogger(__name__)
 
@@ -45,9 +45,21 @@ _BAL_FORWARD_RE = re.compile(
 
 # HSBC's printed type codes. CR is the only inbound code on the statements
 # we have; everything else is outbound. ``)))`` is how pdfplumber renders
-# the contactless glyph.
-_TYPE_OUT = frozenset({"BP", "DD", "VIS", "DR", ")))"})
+# the contactless glyph. OBP is an online bill payment; ATM is a cash
+# withdrawal — both outbound, and both were silently dropped before they
+# were added here.
+_TYPE_OUT = frozenset({"BP", "OBP", "DD", "VIS", "DR", "ATM", ")))"})
 _TYPE_IN = frozenset({"CR"})
+
+# Account Summary block on page 1. pdfplumber glues the bold labels
+# ("OpeningBalance", "ClosingBalance") but keeps spaces in "Payments In" /
+# "Payments Out", hence the \s* / \s+ asymmetry below.
+_SUMMARY_RES: dict[str, re.Pattern[str]] = {
+    "opening_balance": re.compile(r"Opening\s*Balance\s+(-?[\d,]+\.\d{2})", re.I),
+    "paid_in": re.compile(r"Payments\s+In\s+(-?[\d,]+\.\d{2})", re.I),
+    "paid_out": re.compile(r"Payments\s+Out\s+(-?[\d,]+\.\d{2})", re.I),
+    "closing_balance": re.compile(r"Closing\s*Balance\s+(-?[\d,]+\.\d{2})", re.I),
+}
 
 _MONTHS = {
     "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
@@ -91,11 +103,44 @@ class HsbcExtractor:
         # as the generic extractor (newest-first).
         return [_to_raw_row(t) for t in reversed(txns)]
 
+    def summary(
+        self, pdf_path: Path, page_texts: list[str] | None = None
+    ) -> RawSummary | None:
+        """Return the printed Account Summary totals, or None if not found.
+
+        Implements the optional SummaryProvider protocol so normalize.py can
+        reconcile the extracted rows against the figures HSBC prints on page 1.
+        """
+        if page_texts is None:
+            page_texts = _read_pdf_text(pdf_path)
+        return _parse_summary("\n".join(page_texts))
+
 
 def _read_pdf_text(pdf_path: Path) -> list[str]:
     """Return the text of each page using pdfplumber (no OCR)."""
     with pdfplumber.open(pdf_path) as pdf:
         return [page.extract_text() or "" for page in pdf.pages]
+
+
+def _parse_summary(text: str) -> RawSummary | None:
+    """Pull the four Account Summary figures out of the full statement text.
+
+    Returns None when none of the four labels are present (e.g. a scanned
+    statement with no extractable text), so the pipeline simply skips
+    reconciliation rather than reconciling against blanks.
+    """
+    found = {
+        key: (match.group(1) if (match := pattern.search(text)) else "")
+        for key, pattern in _SUMMARY_RES.items()
+    }
+    if not any(found.values()):
+        return None
+    return RawSummary(
+        opening_balance=found["opening_balance"],
+        paid_in=found["paid_in"],
+        paid_out=found["paid_out"],
+        closing_balance=found["closing_balance"],
+    )
 
 
 def _parse(page_texts: list[str]) -> list[_Txn]:
@@ -152,7 +197,16 @@ def _parse(page_texts: list[str]) -> list[_Txn]:
                 line = line[len(type_code):].strip()
 
             if current is None:
-                log.debug("hsbc: ignoring orphan line %r", line)
+                # Inside the table, with no transaction open, a line that
+                # carries no recognised type code is almost always a row whose
+                # leading code we don't know yet (e.g. a new HSBC type code) —
+                # which means a transaction is being dropped. Warn loudly so it
+                # is not lost silently the way OBP/ATM rows once were.
+                log.warning(
+                    "hsbc: dropping unrecognised table line %r "
+                    "(no known type code) — a transaction may be missing",
+                    line,
+                )
                 continue
 
             _consume(current, line)

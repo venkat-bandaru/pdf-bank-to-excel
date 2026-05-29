@@ -62,12 +62,51 @@ class Transaction:
 
 
 @dataclass
+class RawSummary:
+    """Printed statement-summary totals, as raw strings.
+
+    Banks print an "Account Summary" block (opening balance, total paid in,
+    total paid out, closing balance). Extractors that can find it return this
+    so normalize.py can reconcile the extracted rows against it. Strings only,
+    same contract as RawRow: parsing is normalize.py's job. Any field the
+    statement omits is the empty string.
+    """
+
+    opening_balance: str
+    paid_in: str
+    paid_out: str
+    closing_balance: str
+
+
+@dataclass(frozen=True)
+class Reconciliation:
+    """Outcome of checking extracted rows against the printed summary totals.
+
+    This is the accountant's sanity check: the sum of the money-in column must
+    equal the statement's stated "Payments In", likewise money-out, and
+    ``opening + in - out`` must land on the stated closing balance. ``ok`` is
+    False when any of those disagree beyond a rounding tolerance; ``issues``
+    holds one human-readable line per discrepancy for the export/Notes.
+    """
+
+    opening_balance: Decimal | None
+    closing_balance: Decimal | None
+    stated_paid_in: Decimal | None
+    stated_paid_out: Decimal | None
+    extracted_paid_in: Decimal
+    extracted_paid_out: Decimal
+    ok: bool
+    issues: tuple[str, ...]
+
+
+@dataclass
 class Statement:
     """The result of processing one PDF file through the full pipeline."""
 
     source_pdf: Path
     bank: str
     transactions: list[Transaction]
+    reconciliation: Reconciliation | None = None
 
 
 @dataclass(frozen=True)

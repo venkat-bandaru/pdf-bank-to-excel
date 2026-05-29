@@ -13,7 +13,7 @@ import logging
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-from statement_to_excel.models import RawRow, Transaction
+from statement_to_excel.models import RawRow, RawSummary, Reconciliation, Transaction
 
 log = logging.getLogger(__name__)
 
@@ -39,6 +39,78 @@ def normalize(rows: list[RawRow], source_pdf: Path) -> list[Transaction]:
         if txn is not None:
             parsed.append(txn)
     return _flag_chain_breaks(parsed)
+
+
+def reconcile(
+    txns: list[Transaction], summary: RawSummary, source_pdf: Path
+) -> Reconciliation:
+    """Check extracted rows against the statement's printed summary totals.
+
+    This is the accountant's end-to-end sanity check, and the one that catches
+    a whole missing transaction — something the per-row balance-chain check in
+    `_flag_chain_breaks` cannot do for layouts (like HSBC) that print a balance
+    only once per day. Three independent assertions:
+
+      * sum(money_in)  == stated "Payments In"
+      * sum(money_out) == stated "Payments Out"
+      * opening + in - out == stated closing balance
+
+    Each stated figure is optional; a check is skipped if its figure is absent.
+
+    Args:
+        txns: The normalized transactions for one statement.
+        summary: The printed totals as raw strings, from the extractor.
+        source_pdf: Used only for log messages.
+
+    Returns:
+        A Reconciliation with ``ok`` False (and one ``issues`` line per
+        mismatch) when any check fails beyond the rounding tolerance.
+    """
+    opening = _parse_money(summary.opening_balance)
+    closing = _parse_money(summary.closing_balance)
+    stated_in = _parse_money(summary.paid_in)
+    stated_out = _parse_money(summary.paid_out)
+
+    extracted_in = sum((t.money_in or _ZERO for t in txns), _ZERO)
+    extracted_out = sum((t.money_out or _ZERO for t in txns), _ZERO)
+
+    issues: list[str] = []
+    if stated_in is not None and abs(stated_in - extracted_in) > _TOLERANCE:
+        issues.append(
+            f"Payments In: statement says {stated_in}, extracted rows sum to "
+            f"{extracted_in} (off by {extracted_in - stated_in})"
+        )
+    if stated_out is not None and abs(stated_out - extracted_out) > _TOLERANCE:
+        issues.append(
+            f"Payments Out: statement says {stated_out}, extracted rows sum to "
+            f"{extracted_out} (off by {extracted_out - stated_out})"
+        )
+    if opening is not None and closing is not None:
+        computed = opening + extracted_in - extracted_out
+        if abs(computed - closing) > _TOLERANCE:
+            issues.append(
+                f"Closing balance: opening {opening} + in {extracted_in} - out "
+                f"{extracted_out} = {computed}, statement says {closing} "
+                f"(off by {computed - closing})"
+            )
+
+    ok = not issues
+    if ok:
+        log.info("normalize: %s reconciles against the printed summary", source_pdf.name)
+    else:
+        for issue in issues:
+            log.warning("normalize: reconciliation failed for %s: %s", source_pdf.name, issue)
+
+    return Reconciliation(
+        opening_balance=opening,
+        closing_balance=closing,
+        stated_paid_in=stated_in,
+        stated_paid_out=stated_out,
+        extracted_paid_in=extracted_in,
+        extracted_paid_out=extracted_out,
+        ok=ok,
+        issues=tuple(issues),
+    )
 
 
 def _parse_row(row: RawRow, source_pdf: Path) -> Transaction | None:

@@ -13,7 +13,7 @@ from pathlib import Path
 from statement_to_excel import detect, export, ingest, normalize
 from statement_to_excel.extractors.barclays import BarclaysExtractor
 from statement_to_excel.extractors.barclays_2026 import Barclays2026Extractor
-from statement_to_excel.extractors.base import Extractor
+from statement_to_excel.extractors.base import Extractor, SummaryProvider
 from statement_to_excel.extractors.generic import GenericExtractor
 from statement_to_excel.extractors.hsbc import HsbcExtractor
 from statement_to_excel.extractors.lloyds import LloydsExtractor
@@ -85,7 +85,22 @@ def _process_one(pdf_path: Path, config: Config) -> None:
     raw_rows = extractor.extract(pdf_path, page_texts=None)
 
     transactions = normalize.normalize(raw_rows, pdf_path)
-    statement = Statement(source_pdf=pdf_path, bank=bank_name, transactions=transactions)
+
+    # If the extractor can read the printed Account Summary, reconcile the
+    # extracted rows against it (opening + in - out == closing). This catches
+    # whole missing transactions, which the per-row balance chain cannot.
+    reconciliation = None
+    if isinstance(extractor, SummaryProvider):
+        raw_summary = extractor.summary(pdf_path, page_texts=None)
+        if raw_summary is not None:
+            reconciliation = normalize.reconcile(transactions, raw_summary, pdf_path)
+
+    statement = Statement(
+        source_pdf=pdf_path,
+        bank=bank_name,
+        transactions=transactions,
+        reconciliation=reconciliation,
+    )
     out_path = export.export(statement, config.output_dir)
     log.info("%s: written to %s", pdf_path.name, out_path)
 

@@ -99,6 +99,32 @@ The `normalize` stage still validates that running balances chain correctly
 (`prev_balance + money_in - money_out == balance`); rows that break the chain
 are flagged in the Excel output so a human can spot-check.
 
+## Statement-level reconciliation
+
+The per-row balance-chain check above is weak for layouts that print a running
+balance only once per day (HSBC, for example): the intermediate rows have no
+balance to diff against, so a *whole missing transaction* on a multi-row day
+slips through without flagging anything.
+
+To catch that, an extractor may also expose the statement's printed
+"Account Summary" totals (opening balance, total paid in, total paid out,
+closing balance) via the optional `SummaryProvider` protocol in
+`extractors/base.py`. This is deliberately separate from the `Extractor`
+protocol: not every layout prints usable totals, and making it optional means
+adding it to one extractor does not change the contract for the others. The
+pipeline checks `isinstance(extractor, SummaryProvider)` and, when present,
+calls `normalize.reconcile()` to assert three things end-to-end:
+
+- `sum(money_in)  == stated "Payments In"`
+- `sum(money_out) == stated "Payments Out"`
+- `opening + in - out == stated closing balance`
+
+The result is a `Reconciliation` on the `Statement`. A mismatch is logged at
+WARNING and written to a "Summary" worksheet in the output `.xlsx` (PASS /
+REVIEW plus the specific discrepancies). A failed reconciliation does **not**
+move the file to `failed/`: the rows we did extract are still useful, and the
+accountant wants to see them alongside the flag, not have them hidden.
+
 ## Canonical model
 
 `models.py` defines `Transaction` as a frozen dataclass:

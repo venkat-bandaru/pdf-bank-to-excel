@@ -14,8 +14,27 @@ from pathlib import Path
 
 import pytest
 
+from statement_to_excel.extractors.base import SummaryProvider
 from statement_to_excel.extractors.hsbc import HsbcExtractor
 from statement_to_excel.models import RawRow
+
+# A synthetic two-day HSBC table exercising the OBP (online bill payment) and
+# ATM (cash withdrawal) type codes, both of which were silently dropped before
+# they were added to the extractor's known codes. Kept inline rather than as a
+# PDF fixture so no real customer statement has to be committed.
+_OBP_ATM_PAGE = """\
+Date Payment type and details Paid out Paid in Balance
+10 Feb 25 BP Nupur Lanjekar
+January Invoice 1,320.00
+OBP Cloud Odyssey It S
+pisp1411485430 1,846.52
+BP Hoshi Digital Ltd
+January Invoice 9,900.00 49,604.27
+18 Feb 25 ))) SQ *CHAI GUYS
+London 2.94
+ATM CASH NATWEST FEB18
+LIVERPOOL ST@16:31 100.00 24,163.52
+"""
 
 # Hand-counted from tests/samples/August.pdf.
 _EXPECTED_ROW_COUNT = 91
@@ -91,6 +110,48 @@ def test_hsbc_august_no_marker_lines_leak_into_rows(august_rows: list[RawRow]) -
         assert "CARRIEDFORWARD" not in upper.replace(" ", "")
         assert "BALANCEBROUGHTFORWARD" not in upper.replace(" ", "")
         assert "BALANCECARRIEDFORWARD" not in upper.replace(" ", "")
+
+
+def test_hsbc_obp_and_atm_codes_are_captured() -> None:
+    """OBP and ATM rows must not be dropped (regression for silent loss)."""
+    rows = HsbcExtractor().extract(Path("unused.pdf"), page_texts=[_OBP_ATM_PAGE])
+    by_amount = {r.money_out: r for r in rows}
+
+    obp = by_amount["1846.52"]
+    assert obp.description.startswith("OBP ")
+    assert "pisp1411485430" in obp.description
+    assert obp.money_in == ""
+
+    atm = by_amount["100.00"]
+    assert atm.description.startswith("ATM ")
+    assert "NATWEST" in atm.description.upper()
+    assert atm.money_in == ""
+
+
+def test_hsbc_summary_parses_account_summary() -> None:
+    """summary() lifts the four printed totals out of the statement text."""
+    page = (
+        "OpeningBalance 53,561.50\n"
+        "Payments In 138,576.18\n"
+        "Payments Out 167,993.86\n"
+        "ClosingBalance 24,143.82\n"
+    )
+    summary = HsbcExtractor().summary(Path("unused.pdf"), page_texts=[page])
+    assert summary is not None
+    assert summary.opening_balance == "53,561.50"
+    assert summary.paid_in == "138,576.18"
+    assert summary.paid_out == "167,993.86"
+    assert summary.closing_balance == "24,143.82"
+
+
+def test_hsbc_summary_absent_returns_none() -> None:
+    """No summary block (e.g. a page with no totals) yields None, not blanks."""
+    assert HsbcExtractor().summary(Path("unused.pdf"), page_texts=["no totals here"]) is None
+
+
+def test_hsbc_extractor_is_a_summary_provider() -> None:
+    """The pipeline relies on this isinstance check to decide to reconcile."""
+    assert isinstance(HsbcExtractor(), SummaryProvider)
 
 
 def test_hsbc_august_balance_chain_reconstructs_closing(august_rows: list[RawRow]) -> None:
